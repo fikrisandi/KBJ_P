@@ -4,6 +4,7 @@ import threading
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
+
 class Client:
     def __init__(self, host, port):
         self.host = host
@@ -27,6 +28,7 @@ class Client:
         file_size = int(header.split('file-size: ')[1].split(',')[0])
         return file_name, file_size
 
+
 def receive_messages(client):
     while True:
         try:
@@ -35,7 +37,7 @@ def receive_messages(client):
                 if "\r\n\r\n" in message:
                     header, _ = message.split("\r\n\r\n")
                     file_name, file_size = client.parse_header(header)
-                    file_path = os.path.join(BASE_DIR, 'files', file_name)
+                    file_path = os.path.join(BASE_DIR, 'downloads', file_name)
 
                     with open(file_path, 'wb') as f:
                         total_data = 0
@@ -45,13 +47,16 @@ def receive_messages(client):
                                 break
                             f.write(data)
                             total_data += len(data)
+                            print(f"Menerima data: {len(data)} bytes")
                         print(f"File {file_name} downloaded successfully.")
+
                 else:
                     print(message)
 
         except:
             print("Disconnected from server.")
             break
+
 
 if __name__ == "__main__":
     client = Client('127.0.0.1', 65432)
@@ -70,7 +75,8 @@ if __name__ == "__main__":
 
         elif message.startswith("/send_file"):
             try:
-                _, recipient, filename = message.split()
+                _, recipient, filename = message.split(
+                    " ", 2)  # Split maksimal 2 spasi
                 filepath = os.path.join(BASE_DIR, filename)
 
                 if not os.path.exists(filepath):
@@ -83,17 +89,23 @@ if __name__ == "__main__":
                 client.send_message(header)
 
                 with open(filepath, "rb") as f:
-                    while True:
+                    data = f.read(1024)
+                    while data:
+                        client.socket.sendall(data)
                         data = f.read(1024)
-                        if not data:
-                            break
-                        # Kirim data tanpa encode()
-                        client.send_message(data)  
+
+                # with open(filepath, "rb") as f:
+                #     while True:
+                #         data = f.read(1024)
+                #         if not data:
+                #             break
+                #         client.socket.sendall(data)  # Kirim data file
 
                 print(f"File {filename} berhasil dikirim ke {recipient}")
 
             except ValueError:
-                print("Format perintah salah. Gunakan: /send_file <penerima> <nama_file>")
+                print(
+                    "Format perintah salah. Gunakan: /send_file <penerima> <nama_file>")
 
         else:
             client.send_message(message)
